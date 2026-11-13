@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jagua Limpia — Prototipo móvil</title>
+<!-- Mapa real: Leaflet + teselas públicas (OpenStreetMap / Esri) y geocodificación Nominatim -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<style>
+:root{
+  --primary:#2E7D32; --primary-dark:#1B5E20; --primary-light:#E8F5E9; --secondary:#4CAF50;
+  --bg:#F3F5F3; --surface:#FFFFFF; --text:#1D2420; --muted:#667066; --border:#DFE5DE;
+  --nuevo:#2563EB; --nuevo-bg:#DBEAFE; --revision:#D97706; --revision-bg:#FEF3C7;
+  --atendido:#16A34A; --atendido-bg:#DCFCE7; --cerrado:#64748B; --cerrado-bg:#E2E8F0;
+  --alta:#DC2626; --alta-bg:#FEE2E2; --media:#D97706; --media-bg:#FEF3C7; --baja:#475569; --baja-bg:#E2E8F0;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:var(--text);
+  background:radial-gradient(circle at 20% 10%,#E4EEE2,#CBD8C8 70%);display:flex;align-items:center;justify-content:center;padding:16px;}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit;}
+button{cursor:pointer;}
+.hidden{display:none !important;}
+.ic{width:18px;height:18px;flex-shrink:0;display:block;}
+
+/* ---------- STAGE ---------- */
+.stage{display:flex;align-items:center;gap:56px;}
+.side-info{max-width:290px;}
+.side-info .tag{display:inline-block;background:var(--primary-light);color:var(--primary-dark);font-size:11.5px;font-weight:700;
+  padding:5px 11px;border-radius:20px;margin-bottom:14px;}
+.side-info h1{font-size:30px;font-weight:800;color:var(--primary-dark);line-height:1.1;margin-bottom:10px;}
+.side-info p{font-size:13.5px;color:#4B574A;line-height:1.55;margin-bottom:18px;}
+.side-info ol{font-size:13px;color:#3A463A;padding-left:18px;line-height:1.9;margin-bottom:20px;}
+.side-info .reset{background:transparent;border:1.5px solid var(--primary-dark);color:var(--primary-dark);padding:9px 16px;
+  border-radius:10px;font-weight:700;font-size:12.5px;}
+.side-info .reset:hover{background:var(--primary-dark);color:#fff;}
+
+/* ---------- PHONE ---------- */
+.phone{position:relative;width:392px;height:min(820px,calc(100vh - 32px));background:var(--primary-dark);border:9px solid #101C14;
+  border-radius:44px;box-shadow:0 30px 70px rgba(10,30,15,.35);overflow:hidden;display:flex;flex-direction:column;flex-shrink:0;}
+.statusbar{height:32px;background:var(--primary-dark);color:#fff;display:flex;align-items:center;justify-content:space-between;
+  padding:0 22px;font-size:12px;font-weight:600;flex-shrink:0;position:relative;}
+.statusbar .notch{position:absolute;left:50%;top:7px;width:70px;height:14px;background:#101C14;border-radius:10px;transform:translateX(-50%);}
+
+/* ---------- LOGIN ---------- */
+#login{flex:1;overflow-y:auto;background:linear-gradient(170deg,var(--primary-dark),var(--primary) 70%);padding:26px 26px 22px;
+  display:flex;flex-direction:column;align-items:center;color:#fff;}
+.lg-logo{width:68px;height:68px;border-radius:20px;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;margin-bottom:14px;}
+.lg-logo .ic{width:34px;height:34px;}
+#login h1{font-size:28px;font-weight:800;margin-bottom:6px;}
+#login .tagline{font-size:13px;opacity:.88;text-align:center;line-height:1.45;margin-bottom:24px;max-width:290px;}
+.lg-card{background:#fff;color:var(--text);border-radius:18px;padding:20px 18px;width:100%;}
+.fld{margin-bottom:13px;}
+.fld label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:5px;}
+.fld input,.fld select,.fld textarea{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:10px;background:#FAFBFA;}
+.fld input:focus,.fld select:focus,.fld textarea:focus{outline:none;border-color:var(--primary);background:#fff;}
+.fld.err input,.fld.err select,.fld.err textarea{border-color:var(--alta);background:#FFF7F7;}
+#login>:first-child{margin-top:auto;}
+#login>:last-child{margin-bottom:auto;}
+.lg-err{display:none;align-items:center;gap:8px;background:var(--alta-bg);color:var(--alta);font-size:12px;font-weight:700;
+  padding:9px 11px;border-radius:10px;margin-bottom:13px;line-height:1.35;}
+.lg-err.show{display:flex;}
+.lg-err .ic{width:16px;height:16px;}
+.demo{margin-top:14px;border-top:1px dashed var(--border);padding-top:12px;}
+.demo-t{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;}
+.demo-b{width:100%;display:flex;align-items:center;gap:10px;padding:9px 11px;border:1.5px solid var(--border);border-radius:11px;
+  background:#FAFBFA;text-align:left;margin-bottom:7px;}
+.demo-b:last-child{margin-bottom:0;}
+.demo-b:active{background:var(--primary-light);border-color:var(--primary);}
+.demo-b .di{width:32px;height:32px;border-radius:9px;background:var(--primary-light);color:var(--primary-dark);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.demo-b b{font-size:12.5px;display:block;color:var(--text);}
+.demo-b span{font-size:11px;color:var(--muted);}
+.lg-create{width:100%;margin-top:14px;padding:11px;border-radius:11px;border:1.5px solid rgba(255,255,255,.7);background:rgba(255,255,255,.08);
+  color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;gap:8px;}
+.lg-create:active{background:rgba(255,255,255,.2);}
+.lg-create .ic{width:16px;height:16px;}
+#register{flex:1;overflow-y:auto;background:linear-gradient(170deg,var(--primary-dark),var(--primary) 70%);padding:14px 20px 22px;color:#fff;display:flex;flex-direction:column;}
+.rg-top{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.rg-back{width:36px;height:36px;border-radius:11px;border:none;background:rgba(255,255,255,.16);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.rg-back:active{background:rgba(255,255,255,.28);}
+.rg-top h2{font-size:18px;font-weight:800;}
+.rg-lead{font-size:13px;opacity:.92;margin-bottom:14px;line-height:1.45;}
+.type-card{width:100%;display:flex;align-items:center;gap:12px;background:#fff;color:var(--text);border:2px solid transparent;border-radius:16px;padding:14px;margin-bottom:12px;text-align:left;}
+.type-card:active{border-color:var(--secondary);}
+.type-card .ti{width:46px;height:46px;border-radius:12px;background:var(--primary-light);color:var(--primary-dark);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.type-card .ti .ic{width:23px;height:23px;}
+.type-card b{font-size:14.5px;display:block;margin-bottom:2px;}
+.type-card .d{font-size:12px;color:var(--muted);line-height:1.4;display:block;}
+.type-card .chev{margin-left:auto;color:var(--muted);font-size:22px;flex-shrink:0;}
+.rg-type{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+.rg-type .chipx{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.18);padding:6px 12px;border-radius:20px;font-size:12px;font-weight:700;}
+.rg-type .chipx .ic{width:14px;height:14px;}
+.rg-type button{margin-left:auto;border:none;background:none;color:#fff;font-size:12px;font-weight:700;text-decoration:underline;}
+.rg-sec{font-size:11.5px;font-weight:800;color:var(--primary-dark);margin:4px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+.rg-sec:not(:first-child){margin-top:16px;}
+.ferr{font-size:11px;color:var(--alta);font-weight:600;margin-top:4px;display:none;}
+.fld.err .ferr{display:block;}
+.rg-ok{text-align:center;}
+.rg-ok .big{width:58px;height:58px;border-radius:50%;background:var(--atendido-bg);color:var(--atendido);display:flex;align-items:center;justify-content:center;margin:2px auto 10px;}
+.rg-ok .big .ic{width:30px;height:30px;}
+.rg-ok h3{font-size:17px;margin-bottom:4px;color:var(--text);}
+.rg-ok p{font-size:12.5px;color:var(--muted);line-height:1.5;margin-bottom:12px;}
+.rg-sum{text-align:left;margin-bottom:14px;}
+.rg-sum .irow{font-size:12.5px;}
+.rg-note{background:var(--media-bg);color:#8A5A0A;border-radius:10px;padding:9px 11px;font-size:11.5px;line-height:1.45;margin-bottom:14px;text-align:left;}
+.btn-primary,.btn-dark,.btn-danger,.btn-ghost{border:none;border-radius:11px;padding:12px 18px;font-weight:700;font-size:13.5px;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;}
+.btn-primary{background:var(--primary);color:#fff;} .btn-primary:hover{background:var(--primary-dark);}
+.btn-dark{background:#334155;color:#fff;}
+.btn-danger{background:var(--alta-bg);color:var(--alta);}
+.btn-ghost{background:#fff;border:1.5px solid var(--border);color:var(--muted);}
+.full{width:100%;}
+.lg-note{font-size:11px;opacity:.8;text-align:center;margin-top:14px;line-height:1.4;}
+
+/* ---------- APP ---------- */
+#app{display:none;flex:1;min-height:0;flex-direction:column;background:var(--bg);position:relative;}
+#app.on{display:flex;}
+.topbar{background:var(--primary);color:#fff;display:flex;align-items:center;gap:10px;padding:10px 12px;flex-shrink:0;}
+.tb-btn{width:36px;height:36px;border-radius:11px;border:none;background:rgba(255,255,255,.16);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.tb-btn:active{background:rgba(255,255,255,.28);}
+.topbar h2{flex:1;font-size:16.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.view{flex:1;min-height:0;overflow-y:auto;padding:16px 16px 22px;}
+.tabbar{display:flex;background:#fff;border-top:1px solid var(--border);flex-shrink:0;padding-bottom:4px;}
+.tab{flex:1;border:none;background:none;padding:9px 0 6px;display:flex;flex-direction:column;align-items:center;gap:3px;
+  font-size:10.5px;font-weight:700;color:var(--muted);}
+.tab.active{color:var(--primary-dark);}
+.tab.active .ic{color:var(--primary);}
+
+/* drawer */
+.drawer-ov{position:absolute;inset:0;background:rgba(10,20,12,.5);opacity:0;pointer-events:none;transition:opacity .22s;z-index:30;}
+.drawer-ov.show{opacity:1;pointer-events:auto;}
+.drawer{position:absolute;top:0;bottom:0;left:0;width:260px;background:var(--primary-dark);color:#fff;transform:translateX(-102%);
+  transition:transform .25s ease;z-index:31;display:flex;flex-direction:column;}
+.drawer.open{transform:translateX(0);}
+.dr-head{padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,.14);}
+.dr-head .lg{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.dr-head .lg .lg-i{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;}
+.dr-head b{font-size:15px;display:block;}
+.dr-head small{font-size:10.5px;opacity:.75;}
+.role-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.14);padding:5px 11px;border-radius:20px;font-size:12px;font-weight:700;}
+.dr-list{flex:1;padding:10px;overflow-y:auto;}
+.dr-item{width:100%;display:flex;align-items:center;gap:12px;padding:12px;border:none;background:none;color:rgba(255,255,255,.82);
+  border-radius:10px;font-size:13.5px;font-weight:600;text-align:left;margin-bottom:3px;}
+.dr-item.active{background:var(--secondary);color:#fff;}
+.dr-foot{padding:12px;border-top:1px solid rgba(255,255,255,.14);}
+.dr-foot button{width:100%;display:flex;align-items:center;gap:10px;padding:11px 12px;border:none;border-radius:10px;
+  background:rgba(255,255,255,.1);color:#fff;font-weight:700;font-size:13px;}
+
+/* ---------- COMPONENTES ---------- */
+.sub-head{font-size:12.5px;color:var(--muted);margin-bottom:14px;line-height:1.45;}
+.card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px;}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:14px;font-weight:800;margin-bottom:12px;}
+.card-h .l{display:flex;align-items:center;gap:8px;}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.kpi{background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px;}
+.kpi .n{font-size:24px;font-weight:800;line-height:1.1;}
+.kpi .l{font-size:11.5px;color:var(--muted);margin:2px 0 8px;}
+
+.badge{font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:20px;white-space:nowrap;display:inline-block;}
+.b-nuevo{background:var(--nuevo-bg);color:var(--nuevo);} .b-revision{background:var(--revision-bg);color:var(--revision);}
+.b-atendido{background:var(--atendido-bg);color:var(--atendido);} .b-cerrado{background:var(--cerrado-bg);color:var(--cerrado);}
+.b-alta{background:var(--alta-bg);color:var(--alta);} .b-media{background:var(--media-bg);color:var(--media);} .b-baja{background:var(--baja-bg);color:var(--baja);}
+
+.btn-view{border:1.5px solid var(--primary);background:none;color:var(--primary-dark);font-weight:800;font-size:11px;padding:5px 11px;border-radius:8px;}
+
+.searchbox{display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid var(--border);border-radius:11px;padding:0 12px;margin-bottom:10px;color:var(--muted);}
+.searchbox input{flex:1;border:none;outline:none;padding:11px 0;background:none;color:var(--text);}
+.empty{text-align:center;color:var(--muted);font-size:13px;padding:34px 16px;line-height:1.5;}
+
+/* detalle */
+.hero{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px;}
+.hero .id{font-size:12px;color:var(--muted);font-weight:700;}
+.hero h3{font-size:18px;font-weight:800;margin-top:2px;}
+.hero .bs{display:flex;flex-direction:column;gap:5px;align-items:flex-end;}
+.irow{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.irow:last-child{border-bottom:none;}
+.irow .k{color:var(--muted);} .irow .v{font-weight:700;text-align:right;}
+.desc{font-size:13.5px;line-height:1.55;}
+.photo{height:130px;border-radius:12px;background:linear-gradient(135deg,#DCE7D8,#C9D9C4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#4A6A47;font-size:12.5px;font-weight:600;}
+.photo .ic{width:28px;height:28px;}
+.photo.none{background:#F0F2EF;color:var(--muted);border:1.5px dashed var(--border);}
+.banner{display:flex;gap:10px;align-items:flex-start;background:var(--cerrado-bg);color:#334155;border-radius:12px;padding:12px 14px;font-size:12.5px;line-height:1.45;margin-bottom:14px;}
+.tl{display:flex;gap:11px;padding-bottom:12px;position:relative;}
+.tl i{width:10px;height:10px;border-radius:50%;background:var(--primary);margin-top:4px;flex-shrink:0;box-shadow:0 0 0 3px var(--primary-light);}
+.tl:not(:last-child)::before{content:'';position:absolute;left:4px;top:15px;bottom:-2px;width:2px;background:var(--border);}
+.tl b{font-size:12.5px;display:block;line-height:1.4;} .tl span{font-size:11px;color:var(--muted);}
+.admin{border:1.5px solid #B7D8B9;background:#F7FBF7;}
+.admin .lbl{font-size:11.5px;font-weight:800;color:var(--muted);margin:10px 0 6px;text-transform:uppercase;letter-spacing:.03em;}
+.chips{display:flex;gap:6px;flex-wrap:wrap;}
+.chip{border:1.5px solid var(--border);background:#fff;padding:7px 12px;border-radius:20px;font-size:12px;font-weight:700;color:var(--muted);}
+.chip.on.nuevo{background:var(--nuevo-bg);border-color:var(--nuevo);color:var(--nuevo);}
+.chip.on.revision{background:var(--revision-bg);border-color:var(--revision);color:var(--revision);}
+.chip.on.atendido{background:var(--atendido-bg);border-color:var(--atendido);color:var(--atendido);}
+.chip.on.cerrado{background:var(--cerrado-bg);border-color:var(--cerrado);color:var(--cerrado);}
+.chip.on.alta{background:var(--alta-bg);border-color:var(--alta);color:var(--alta);}
+.chip.on.media{background:var(--media-bg);border-color:var(--media);color:var(--media);}
+.chip.on.baja{background:var(--baja-bg);border-color:var(--baja);color:var(--baja);}
+.admin textarea{width:100%;min-height:62px;resize:none;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;background:#fff;margin-bottom:12px;}
+.admin .btn-primary,.admin .btn-dark,.admin .btn-danger{margin-top:8px;}
+
+/* mapa */
+.legend{display:flex;gap:6px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-bottom:10px;font-weight:600;}
+.legend button{display:flex;align-items:center;gap:5px;border:1.5px solid var(--border);background:#fff;border-radius:20px;padding:5px 10px;font-size:11.5px;font-weight:700;color:var(--text);}
+.legend button.off{opacity:.45;text-decoration:line-through;}
+.legend i{width:10px;height:10px;border-radius:50%;display:inline-block;}
+.mapbox{position:relative;height:380px;border-radius:14px;overflow:hidden;border:1px solid var(--border);background:#EAEFE6;}
+.mapbox.mini{height:170px;margin-bottom:0;}
+.mapbox.pick{height:230px;}
+.lmap{position:absolute;inset:0;z-index:0;background:#EAEFE6;}
+.leaflet-container{font-family:inherit;}
+.leaflet-control-attribution{font-size:9px !important;}
+.map-off{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:20px;text-align:center;color:var(--muted);font-size:12.5px;font-weight:600;}
+.map-off .ic{width:28px;height:28px;}
+.mk-wrap{background:none;border:none;}
+.mk{display:block;width:24px;height:24px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--c);
+  border:2px solid #fff;box-shadow:0 3px 7px rgba(0,0,0,.3);position:relative;transition:transform .15s;}
+.mk::after{content:'';position:absolute;inset:6px;background:#fff;border-radius:50%;}
+.mk.sel{transform:rotate(-45deg) scale(1.3);}
+.lctl a{display:flex !important;align-items:center;justify-content:center;color:var(--primary-dark) !important;cursor:pointer;}
+.lctl a .ic{width:16px;height:16px;}
+.me-dot{width:16px;height:16px;border-radius:50%;background:#2563EB;border:3px solid #fff;box-shadow:0 0 0 6px rgba(37,99,235,.25);}
+.map-tools{display:flex;gap:8px;margin-top:8px;}
+.map-tools button{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 10px;border-radius:10px;border:1.5px solid var(--border);background:#fff;font-size:12px;font-weight:700;color:var(--primary-dark);}
+.map-tools button:active{background:var(--primary-light);}
+.map-tools .ic{width:15px;height:15px;}
+.coords{font-size:11px;color:var(--muted);font-weight:600;}
+.map-card{position:absolute;left:10px;right:10px;bottom:10px;background:#fff;border-radius:13px;padding:12px 14px;box-shadow:0 8px 24px rgba(0,0,0,.22);
+  display:none;z-index:8;}
+.map-card.show{display:block;}
+.map-card .mt{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.map-card .mt b{font-size:14px;}
+.map-card .x{border:none;background:none;color:var(--muted);padding:2px;}
+.map-card p{font-size:12.5px;color:var(--muted);margin:2px 0;}
+.map-card .row{display:flex;gap:6px;margin:8px 0;}
+.map-card .btn-primary{width:100%;padding:9px;font-size:12.5px;}
+.hint{font-size:11.5px;color:var(--muted);margin-top:8px;text-align:center;}
+.pick-hint{position:absolute;right:8px;top:8px;z-index:5;background:rgba(255,255,255,.92);font-size:10.5px;font-weight:700;color:var(--primary-dark);padding:4px 9px;border-radius:7px;pointer-events:none;}
+
+/* stats */
+.bar{display:flex;align-items:center;gap:9px;margin-bottom:11px;font-size:12px;}
+.bar .lb{width:92px;flex-shrink:0;color:var(--muted);font-weight:700;}
+.bar .tr{flex:1;height:10px;background:#EEF1ED;border-radius:8px;overflow:hidden;}
+.bar .fl{height:100%;border-radius:8px;}
+.bar .vl{width:62px;text-align:right;font-weight:800;font-size:11.5px;}
+.donut-row{display:flex;align-items:center;gap:20px;justify-content:center;}
+.donut{width:110px;height:110px;border-radius:50%;position:relative;flex-shrink:0;}
+.donut::after{content:'';position:absolute;inset:26px;background:#fff;border-radius:50%;}
+.dl div{display:flex;align-items:center;gap:8px;font-size:12.5px;margin-bottom:7px;font-weight:600;}
+.dl i{width:10px;height:10px;border-radius:50%;display:inline-block;}
+.rate{display:flex;align-items:center;gap:14px;}
+.rate .big{font-size:30px;font-weight:800;color:var(--primary-dark);}
+.rate p{font-size:12px;color:var(--muted);line-height:1.4;}
+
+/* form */
+.photo-box{border:1.8px dashed var(--border);border-radius:12px;padding:16px;text-align:center;color:var(--muted);font-size:12.5px;
+  display:flex;flex-direction:column;align-items:center;gap:6px;background:#FAFBFA;}
+.photo-box.has{border-color:var(--secondary);background:var(--primary-light);color:var(--primary-dark);font-weight:700;}
+.f-actions{display:flex;gap:10px;margin-top:6px;}
+.f-actions button{flex:1;}
+.pick-state{font-size:11.5px;font-weight:700;color:var(--muted);margin-top:6px;}
+.pick-state.ok{color:var(--primary-dark);}
+
+/* sobre */
+.about h4{font-size:14px;color:var(--primary-dark);margin:14px 0 4px;} .about h4:first-child{margin-top:0;}
+.about p{font-size:13px;line-height:1.6;}
+.note{margin-top:16px;background:var(--media-bg);color:#8A5A0A;border-radius:11px;padding:12px 14px;font-size:12px;line-height:1.5;}
+
+/* modal + toast */
+.modal-ov{position:absolute;inset:0;background:rgba(10,20,12,.55);display:none;align-items:center;justify-content:center;padding:22px;z-index:50;}
+.modal-ov.show{display:flex;}
+.modal{background:#fff;border-radius:16px;padding:20px;width:100%;}
+.modal h3{font-size:16px;margin-bottom:6px;} .modal p{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:16px;}
+.m-actions{display:flex;gap:10px;} .m-actions button{flex:1;padding:11px;}
+.toast{position:absolute;left:16px;right:16px;bottom:78px;background:var(--primary-dark);color:#fff;padding:12px 14px;border-radius:12px;font-size:13px;font-weight:600;
+  display:flex;align-items:center;gap:9px;box-shadow:0 10px 26px rgba(0,0,0,.28);opacity:0;transform:translateY(12px);transition:all .25s;pointer-events:none;z-index:60;}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast.error{background:var(--alta);}
+
+/* responsive */
+@media (max-width:1020px){ .side-info{display:none;} }
+@media (max-width:520px){
+  body{padding:0;background:var(--primary-dark);}
+  .phone{width:100vw;height:100vh;height:100dvh;border:none;border-radius:0;box-shadow:none;}
+  .statusbar .notch{display:none;}
+}
+/* ---------- DISEÑO LIMPIO: sombras suaves, más aire ---------- */
+.phone{--bg:#F4F6F3;--sh:0 1px 2px rgba(20,50,25,.05),0 6px 18px rgba(20,50,25,.06);}
+#app{background:var(--bg);}
+.topbar{padding:12px 14px;}
+.topbar h2{display:flex;flex-direction:column;line-height:1.2;font-size:17px;}
+.topbar h2 small{font-size:11px;font-weight:600;opacity:.72;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.card,.kpi{border:none;box-shadow:var(--sh);border-radius:18px;}
+.searchbox{border:none;box-shadow:var(--sh);border-radius:14px;padding:0 14px;margin-bottom:12px;}
+.tabbar{border-top:none;box-shadow:0 -4px 18px rgba(20,50,25,.07);padding:6px 6px 8px;position:relative;z-index:4;}
+.tab{gap:4px;font-weight:600;font-size:10.5px;position:relative;}
+.tab .ic{width:20px;height:20px;padding:4px 16px;box-sizing:content-box;border-radius:16px;transition:background .2s;}
+.tab.active .ic{background:var(--primary-light);}
+.sub-head{font-size:13px;line-height:1.5;}
+.mapbox{border:none;box-shadow:var(--sh);border-radius:18px;}
+.sec-h{display:flex;align-items:center;justify-content:space-between;margin:20px 2px 10px;}
+.sec-h span{font-size:15px;font-weight:800;}
+.sec-h button{border:none;background:none;color:var(--primary);font-weight:700;font-size:12.5px;}
+.fchips{display:flex;gap:8px;overflow-x:auto;margin:0 -16px 12px;padding:2px 16px 4px;scrollbar-width:none;}
+.fchips::-webkit-scrollbar{display:none;}
+.fchip{flex-shrink:0;border:none;background:#fff;box-shadow:var(--sh);padding:8px 14px;border-radius:20px;font-size:12.5px;font-weight:700;color:var(--muted);display:flex;gap:7px;align-items:center;}
+.fchip i{font-style:normal;background:#EEF1ED;color:var(--text);border-radius:10px;padding:1px 7px;font-size:11px;}
+.fchip.on{background:var(--primary);color:#fff;} .fchip.on i{background:rgba(255,255,255,.25);color:#fff;}
+.v-alert{width:100%;display:flex;align-items:center;gap:12px;border:none;background:#fff;box-shadow:var(--sh);border-radius:16px;padding:12px 14px;margin-top:14px;text-align:left;border-left:4px solid var(--nuevo);}
+.v-alert .ico{width:36px;height:36px;border-radius:11px;background:var(--nuevo-bg);color:var(--nuevo);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.v-alert b{display:block;font-size:13.5px;} .v-alert .tx span{font-size:12px;color:var(--muted);}
+.v-alert .chev{margin-left:auto;font-size:22px;color:var(--muted);}
+.v-empty{text-align:center;color:var(--muted);padding:36px 20px;font-size:13px;}
+.v-empty .ic{width:34px;height:34px;margin:0 auto 8px;color:#B7C4B5;}
+
+/* ---------- INICIO: héroe, anillo de avance, mosaicos; tarjetas de reporte ---------- */
+.c-hero{margin:-16px -16px 0;padding:4px 22px 62px;background:var(--primary);color:#fff;border-radius:0 0 30px 30px;}
+.c-hero .c-date{font-size:12px;opacity:.8;font-weight:600;}
+.c-hero h3{font-size:24px;font-weight:800;margin:2px 0 16px;}
+.c-ring-row{display:flex;align-items:center;gap:16px;}
+.c-ring{width:84px;height:84px;border-radius:50%;flex-shrink:0;background:conic-gradient(#fff var(--p),rgba(255,255,255,.22) 0);display:flex;align-items:center;justify-content:center;position:relative;}
+.c-ring::before{content:'';position:absolute;inset:9px;border-radius:50%;background:var(--primary);}
+.c-ring b{position:relative;font-size:19px;font-weight:800;}
+.c-ring-row p{font-size:13px;line-height:1.5;opacity:.92;}
+.c-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:-44px;position:relative;}
+.c-tile{display:flex;flex-direction:column;align-items:flex-start;gap:2px;border:none;background:#fff;box-shadow:var(--sh);border-radius:18px;padding:14px;text-align:left;}
+.c-tile:active{transform:scale(.98);}
+.c-tile .ti{width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;}
+.c-tile b{font-size:24px;font-weight:800;line-height:1.1;} .c-tile>span:last-child{font-size:12px;color:var(--muted);font-weight:600;}
+.c-card{background:#fff;border-radius:18px;box-shadow:var(--sh);padding:14px 16px;margin-bottom:10px;border-left:5px solid var(--sc);cursor:pointer;}
+.c-card:active{background:#FAFBFA;}
+.c-card .c-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.c-card .c-top b{font-size:15px;}
+.c-card .c-loc{display:flex;align-items:center;gap:6px;font-size:13px;margin:8px 0 10px;color:#3A463A;}
+.c-card .c-loc .ic{width:15px;height:15px;color:var(--primary);}
+.c-card .c-bot{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted);font-weight:600;}
+.c-sticky{position:sticky;top:-16px;z-index:3;background:var(--bg);margin:-16px -16px 8px;padding:16px 16px 2px;}
+.tab[data-k="nuevo"] .ic{background:var(--primary);color:#fff;width:24px;height:24px;padding:12px;border-radius:50%;margin-top:-28px;box-shadow:0 8px 18px rgba(46,125,50,.4);border:4px solid #fff;}
+
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <aside class="side-info">
+    <span class="tag">Prototipo académico</span>
+    <h1>Jagua Limpia</h1>
+    <p>Sistema digital para el reporte y seguimiento de puntos de acumulación de residuos sólidos en La Jagua de Ibirico, Cesar.</p>
+    <ol>
+      <li>Ingresa con admin@gmail.com o usuario@gmail.com</li>
+      <li>Revisa el panel de control</li>
+      <li>Usuario: crea un reporte y márcalo en el mapa</li>
+      <li>Consulta la lista y abre el detalle</li>
+      <li>Administrador: cambia estado, cierra y reabre</li>
+      <li>Mira el mapa y las estadísticas</li>
+      <li>Cierra sesión</li>
+    </ol>
+    <button class="reset" onclick="resetProto()">Reiniciar prototipo</button>
+  </aside>
+
+  <div class="phone" id="phone">
+    <div class="statusbar"><span id="clock">9:41</span><span class="notch"></span><span>5G ▮▮▮▯</span></div>
+
+    <!-- LOGIN -->
+    <div id="login">
+      <div class="lg-logo"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-6.5 8-13a8 8 0 10-16 0c0 6.5 8 13 8 13z"/><path d="M12 6v9M12 10c-2 0-3-1.5-3-3"/></svg></div>
+      <h1>Jagua Limpia</h1>
+      <p class="tagline">Sistema Digital para la Gestión Comunitaria de Residuos Sólidos</p>
+      <form class="lg-card" onsubmit="return doLogin(event)" novalidate>
+        <div class="lg-err" id="lgErr"></div>
+        <div class="fld" id="g-email"><label>Correo electrónico</label><input type="email" id="lgEmail" placeholder="nombre@gmail.com" autocomplete="off"></div>
+        <div class="fld" id="g-pass"><label>Contraseña</label><input type="password" id="lgPass" placeholder="••••••••" autocomplete="off"></div>
+        <button type="submit" class="btn-primary full">Ingresar</button>
+        <div class="demo">
+          <div class="demo-t">Usuarios de prueba (toca para autocompletar)</div>
+          <button type="button" class="demo-b" onclick="fillDemo('admin')">
+            <span class="di"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/></svg></span>
+            <div><b>Administrador</b><span>admin@gmail.com · admin123</span></div></button>
+          <button type="button" class="demo-b" onclick="fillDemo('usuario')">
+            <span class="di"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></span>
+            <div><b>Usuario</b><span>usuario@gmail.com · usuario123</span></div></button>
+        </div>
+      </form>
+      <button type="button" class="lg-create" onclick="openRegister()"><span id="icCreate"></span>¿No tienes cuenta? Crear nueva cuenta</button>
+      <p class="lg-note">Prototipo académico: no hay autenticación real.<br>Cada correo abre el perfil que le corresponde.</p>
+    </div>
+
+    <!-- CREAR CUENTA (prototipo: no guarda datos) -->
+    <div id="register" class="hidden">
+      <div class="rg-top">
+        <button type="button" class="rg-back" id="rgBack" onclick="regBack()" aria-label="Volver"></button>
+        <h2 id="rgTitle">Crear cuenta</h2>
+      </div>
+
+      <!-- Paso 1: tipo de cuenta -->
+      <div id="rgStep1">
+        <p class="rg-lead">¿Qué tipo de cuenta quieres crear?</p>
+        <button type="button" class="type-card" onclick="pickType('usuario')">
+          <span class="ti" id="tiUser"></span>
+          <div><b>Usuario</b><span class="d">Ciudadano que registra reportes de residuos y consulta su estado.</span></div><span class="chev">›</span></button>
+        <button type="button" class="type-card" onclick="pickType('admin')">
+          <span class="ti" id="tiAdmin"></span>
+          <div><b>Administrador</b><span class="d">Gestiona los reportes: cambia estados, los cierra y los reabre.</span></div><span class="chev">›</span></button>
+      </div>
+
+      <!-- Paso 2: formulario -->
+      <div id="rgStep2" class="hidden">
+        <div class="rg-type"><span class="chipx" id="rgChip"></span><button type="button" onclick="regShow(1)">Cambiar tipo</button></div>
+        <form class="lg-card" id="rgForm" onsubmit="return submitRegister(event)" novalidate>
+          <div class="rg-sec">Datos personales</div>
+          <div class="fld" id="g-rgName"><label>Nombre completo *</label><input id="rgName" placeholder="Ej: María Fernanda Pérez" autocomplete="off"><div class="ferr" id="e-rgName"></div></div>
+          <div class="fld" id="g-rgDoc"><label>Número de documento *</label><input id="rgDoc" inputmode="numeric" placeholder="Ej: 1065123456" autocomplete="off"><div class="ferr" id="e-rgDoc"></div></div>
+          <div class="fld" id="g-rgPhone"><label>Teléfono *</label><input id="rgPhone" inputmode="tel" placeholder="Ej: 3001234567" autocomplete="off"><div class="ferr" id="e-rgPhone"></div></div>
+          <div class="fld" id="g-rgCargo"><label>Cargo o dependencia *</label><input id="rgCargo" placeholder="Ej: Secretaría de Medio Ambiente" autocomplete="off"><div class="ferr" id="e-rgCargo"></div></div>
+
+          <div class="rg-sec">Ubicación</div>
+          <div class="fld" id="g-rgBarrio"><label>Barrio *</label>
+            <select id="rgBarrio"><option value="">Selecciona...</option><option>Barrio Centro</option><option>La Florida</option><option>El Progreso</option><option>La Esperanza</option><option>Zona rural</option><option>Otro</option></select>
+            <div class="ferr" id="e-rgBarrio"></div></div>
+          <div class="fld" id="g-rgDir"><label>Dirección *</label><input id="rgDir" placeholder="Ej: Calle 5 # 8-21" autocomplete="off"><div class="ferr" id="e-rgDir"></div></div>
+
+          <div class="rg-sec">Cuenta de acceso</div>
+          <div class="fld" id="g-rgEmail"><label>Correo electrónico *</label><input type="email" id="rgEmail" placeholder="nombre@gmail.com" autocomplete="off"><div class="ferr" id="e-rgEmail"></div></div>
+          <div class="fld" id="g-rgPass"><label>Contraseña * (mínimo 6 caracteres)</label><input type="password" id="rgPass" placeholder="••••••••" autocomplete="off"><div class="ferr" id="e-rgPass"></div></div>
+          <div class="fld" id="g-rgPass2"><label>Confirmar contraseña *</label><input type="password" id="rgPass2" placeholder="••••••••" autocomplete="off"><div class="ferr" id="e-rgPass2"></div></div>
+          <button type="submit" class="btn-primary full">Crear cuenta</button>
+        </form>
+      </div>
+
+      <!-- Paso 3: confirmación -->
+      <div id="rgStep3" class="hidden">
+        <div class="lg-card rg-ok">
+          <div class="big" id="rgBig"></div>
+          <h3>¡Cuenta creada!</h3>
+          <p id="rgOkMsg"></p>
+          <div class="rg-sum" id="rgSummary"></div>
+          <div class="rg-note">Prototipo: la cuenta no se guarda. Para ingresar usa los usuarios de prueba del inicio de sesión.</div>
+          <button type="button" class="btn-primary full" onclick="closeRegister()">Volver al inicio de sesión</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- APP -->
+    <div id="app">
+      <header class="topbar">
+        <button class="tb-btn" id="topLeft"></button>
+        <h2 id="topTitle">Panel de control</h2>
+        <button class="tb-btn" id="topLogout" onclick="logout()" aria-label="Cerrar sesión"></button>
+      </header>
+      <main class="view" id="view"></main>
+      <nav class="tabbar" id="tabbar"></nav>
+
+      <div class="drawer-ov" id="drawerOv" onclick="closeDrawer()"></div>
+      <aside class="drawer" id="drawer">
+        <div class="dr-head">
+          <div class="lg"><div class="lg-i" id="drLogo"></div><div><b>Jagua Limpia</b><small>Gestión de residuos sólidos</small></div></div>
+          <span class="role-chip" id="drRole"></span>
+        </div>
+        <div class="dr-list" id="drList"></div>
+        <div class="dr-foot"><button onclick="logout()" id="drLogout"></button></div>
+      </aside>
+    </div>
+
+    <div class="modal-ov" id="modal" onclick="if(event.target===this)closeModal()"><div class="modal" id="modalBox"></div></div>
+    <div class="toast" id="toast"></div>
+  </div>
+</div>
+
+<script>
+/* =============== UTILIDADES =============== */
+const $ = s => document.querySelector(s);
+const pad = n => String(n).padStart(2,'0');
+const esc = t => String(t==null?'':t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function today(){ const d=new Date(); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function fmtF(f){ const p=f.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+
+const STATES = ['Nuevo','En revisión','Atendido','Cerrado'];
+const PRIORS = ['Alta','Media','Baja'];
+const TIPOS  = ['Residuos domésticos','Escombros','Residuos orgánicos','Plásticos','Residuos mixtos','Otros'];
+const SCLS = {'Nuevo':'nuevo','En revisión':'revision','Atendido':'atendido','Cerrado':'cerrado'};
+const SHEX = {'Nuevo':'#2563EB','En revisión':'#D97706','Atendido':'#16A34A','Cerrado':'#64748B'};
+const PCLS = {'Alta':'alta','Media':'media','Baja':'baja'};
+const PHEX = {'Alta':'#DC2626','Media':'#D97706','Baja':'#475569'};
+
+const ICON = {
+  home:'<path d="M3 11l9-8 9 8M5 10v10h14V10"/>',
+  list:'<path d="M4 6h16M4 12h16M4 18h10"/>',
+  map:'<path d="M9 20l-6-3V4l6 3 6-3 6 3v13l-6-3-6 3z"/><path d="M9 4v13M15 7v13"/>',
+  chart:'<path d="M4 20V10M12 20V4M20 20v-7"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/>',
+  logout:'<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>',
+  back:'<path d="M15 18l-6-6 6-6"/>',
+  menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
+  close:'<path d="M18 6L6 18M6 6l12 12"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
+  check:'<path d="M20 6L9 17l-5-5"/>',
+  alert:'<path d="M12 9v4M12 17h.01M10.3 3.86L1.8 18a1.8 1.8 0 001.5 2.7h17.4a1.8 1.8 0 001.5-2.7L13.7 3.86a1.8 1.8 0 00-3.4 0z"/>',
+  lock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
+  unlock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 017.5-2"/>',
+  trash:'<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/>',
+  camera:'<path d="M4 7h3l2-2h6l2 2h3v13H4z"/><circle cx="12" cy="13" r="3.5"/>',
+  pin:'<path d="M12 22s8-6.5 8-13a8 8 0 10-16 0c0 6.5 8 13 8 13z"/><circle cx="12" cy="9" r="2.5"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
+  shield:'<path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.5-4.5"/>',
+  target:'<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
+  expand:'<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+  route:'<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8a3 3 0 000-6H8a3 3 0 010-6h8"/>',
+  ext:'<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/>',
+  leaf:'<path d="M12 22s8-6.5 8-13a8 8 0 10-16 0c0 6.5 8 13 8 13z"/><path d="M12 6v9M12 10c-2 0-3-1.5-3-3"/>'
+};
+function ic(n,style){ return '<svg class="ic" '+(style?'style="'+style+'" ':'')+'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+ICON[n]+'</svg>'; }
+
+/* =============== DATOS =============== */
+function seed(){
+  return [
+    {id:'RP-001',fecha:'2026-10-02',ubicacion:'Barrio Centro',tipo:'Residuos domésticos',prioridad:'Alta',estado:'En revisión',owner:'usuario',foto:true,lat:9.5616,lng:-73.3331,
+      desc:'Acumulación de bolsas de basura junto al parque principal desde hace varios días.',
+      log:[{f:'2026-10-02',t:'Reporte creado'},{f:'2026-10-04',t:'Estado: Nuevo → En revisión'}]},
+    {id:'RP-002',fecha:'2026-10-09',ubicacion:'Barrio La Florida',tipo:'Escombros',prioridad:'Media',estado:'Nuevo',owner:'usuario',foto:false,lat:9.5662,lng:-73.3281,
+      desc:'Escombros de una obra menor dejados sobre la vía pública.',
+      log:[{f:'2026-10-09',t:'Reporte creado'}]},
+    {id:'RP-003',fecha:'2026-09-28',ubicacion:'Barrio El Progreso',tipo:'Residuos mixtos',prioridad:'Alta',estado:'Atendido',owner:'otro',foto:true,lat:9.5589,lng:-73.3392,
+      desc:'Punto crítico con residuos mixtos acumulados en una esquina residencial.',
+      log:[{f:'2026-09-28',t:'Reporte creado'},{f:'2026-09-30',t:'Estado: Nuevo → En revisión'},{f:'2026-10-03',t:'Estado: En revisión → Atendido'}]},
+    {id:'RP-004',fecha:'2026-09-25',ubicacion:'Sector La Esperanza',tipo:'Plásticos',prioridad:'Baja',estado:'Atendido',owner:'otro',foto:false,lat:9.5566,lng:-73.3302,
+      desc:'Bolsas y envases plásticos dispersos cerca de la cancha comunitaria.',
+      log:[{f:'2026-09-25',t:'Reporte creado'},{f:'2026-09-29',t:'Estado: Nuevo → Atendido'}]},
+    {id:'RP-005',fecha:'2026-10-07',ubicacion:'Zona rural',tipo:'Residuos orgánicos',prioridad:'Media',estado:'En revisión',owner:'usuario',foto:false,lat:9.5718,lng:-73.3445,
+      desc:'Residuos orgánicos acumulados al borde de la vía veredal.',
+      log:[{f:'2026-10-07',t:'Reporte creado'},{f:'2026-10-08',t:'Estado: Nuevo → En revisión'}]},
+    {id:'RP-006',fecha:'2026-09-15',ubicacion:'Barrio El Progreso',tipo:'Otros',prioridad:'Baja',estado:'Cerrado',owner:'otro',foto:false,lat:9.5603,lng:-73.3371,
+      desc:'Reporte duplicado de un punto ya gestionado.',
+      log:[{f:'2026-09-15',t:'Reporte creado'},{f:'2026-09-16',t:'Reporte cerrado: Nuevo → Cerrado · Nota: Duplicado'}]}
+  ];
+}
+let reports = seed();
+let nextNum = 7;
+const S = {role:null, email:'', stack:[], f:{q:'',estado:'',prior:''}, photo:false, pick:null, autoUbic:'', mapSel:null, mapHide:{}, cb:null};
+
+function get(id){ return reports.find(r=>r.id===id); }
+function visible(){ return S.role==='admin' ? reports : reports.filter(r=>r.owner==='usuario'); }
+function badge(t,c){ return '<span class="badge b-'+c+'">'+esc(t)+'</span>'; }
+function sB(e){ return badge(e,SCLS[e]); }
+function pB(p){ return badge(p,PCLS[p]); }
+
+/* =============== TOAST / MODAL =============== */
+let toastT;
+function toast(msg,err){
+  const t=$('#toast');
+  t.className='toast'+(err?' error':'');
+  t.innerHTML=ic(err?'alert':'check')+'<span>'+esc(msg)+'</span>';
+  void t.offsetWidth; t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2600);
+}
+function showModal(h){ $('#modalBox').innerHTML=h; $('#modal').classList.add('show'); }
+function closeModal(){ $('#modal').classList.remove('show'); }
+function askConfirm(title,msg,label,cb){
+  S.cb=cb;
+  showModal('<h3>'+esc(title)+'</h3><p>'+esc(msg)+'</p><div class="m-actions"><button class="btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn-danger" onclick="doConfirm()">'+esc(label)+'</button></div>');
+}
+function doConfirm(){ const cb=S.cb; S.cb=null; closeModal(); if(cb)cb(); }
+
+/* =============== MAPA REAL (Leaflet + APIs públicas) ===============
+   - Teselas: OpenStreetMap estándar (calles) y Esri World Imagery (satélite), sin API key
+   - Geocodificación: Nominatim (OpenStreetMap) para dirección ↔ coordenadas
+   - Geolocalización del navegador para "Mi ubicación"                                   */
+const JAGUA=[9.5614,-73.3328];                 // centro de La Jagua de Ibirico (Nominatim)
+const JAGUA_BOX='-73.3728,9.6014,-73.2928,9.5214'; // límite del municipio para búsquedas
+let MAPS=[], MK={}, PICK_MK=null, ME_MK=null, geoT=null, geoSeq=0;
+const GEO_CACHE={};
+const hasL=()=>typeof L!=='undefined';
+const fmtLL=p=>p.lat.toFixed(5)+', '+p.lng.toFixed(5);
+
+function destroyMaps(){ MAPS.forEach(m=>{ try{m.remove();}catch(_){} }); MAPS=[]; MK={}; PICK_MK=null; ME_MK=null; clearTimeout(geoT); }
+function addSatellite(m){
+  const esri='https://server.arcgisonline.com/ArcGIS/rest/services/';
+  L.tileLayer(esri+'World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Imágenes © Esri'}).addTo(m);
+  // Nombres de vías y lugares encima de la imagen satelital
+  L.tileLayer(esri+'Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(m);
+  L.tileLayer(esri+'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:19}).addTo(m);
+}
+function makeMap(id,opt){
+  const el=document.getElementById(id); if(!el) return null;
+  if(!hasL()){ el.innerHTML='<div class="map-off">'+ic('map')+'<span>No se pudo cargar el mapa.<br>Verifica tu conexión a internet.</span></div>'; return null; }
+  opt=opt||{};
+  const m=L.map(el,{zoomControl:true,scrollWheelZoom:opt.wheel!==false});
+  m.attributionControl.setPrefix(false);
+  addSatellite(m);
+  m.setView(opt.center||JAGUA,opt.z||15);
+  MAPS.push(m);
+  setTimeout(()=>m.invalidateSize(),80);
+  return m;
+}
+// Botonera propia dentro del mapa: [[icono, título, acción], ...]
+function toolCtl(btns){
+  const C=L.Control.extend({options:{position:'topleft'},onAdd:function(){
+    const d=L.DomUtil.create('div','leaflet-bar lctl');
+    btns.forEach(b=>{
+      const a=L.DomUtil.create('a','',d); a.href='#'; a.title=b[1]; a.setAttribute('role','button'); a.setAttribute('aria-label',b[1]); a.innerHTML=ic(b[0]);
+      L.DomEvent.on(a,'click',e=>{ L.DomEvent.stop(e); b[2](); });
+    });
+    L.DomEvent.disableClickPropagation(d); return d; }});
+  return new C();
+}
+function mkIcon(color,sel){ return L.divIcon({className:'mk-wrap',html:'<span class="mk'+(sel?' sel':'')+'" style="--c:'+color+'"></span>',iconSize:[24,24],iconAnchor:[12,29]}); }
+function locateMe(m,onFound){
+  if(!navigator.geolocation){ toast('Tu navegador no permite geolocalización',true); return; }
+  toast('Buscando tu ubicación…');
+  navigator.geolocation.getCurrentPosition(p=>{
+    if(MAPS.indexOf(m)<0) return; // el usuario ya cambió de pantalla
+    const ll=[p.coords.latitude,p.coords.longitude];
+    if(ME_MK) ME_MK.remove();
+    ME_MK=L.marker(ll,{icon:L.divIcon({className:'mk-wrap',html:'<div class="me-dot"></div>',iconSize:[16,16],iconAnchor:[8,8]}),interactive:false}).addTo(m);
+    m.setView(ll,17);
+    toast('Ubicación encontrada');
+    if(onFound) onFound(ll);
+  },()=>toast('No se pudo obtener tu ubicación (permiso denegado o sin señal)',true),{enableHighAccuracy:true,timeout:10000});
+}
+
+/* --- Nominatim: coordenadas → dirección --- */
+function reverseGeo(lat,lng){
+  const k=lat.toFixed(5)+','+lng.toFixed(5);
+  if(GEO_CACHE[k]) return Promise.resolve(GEO_CACHE[k]);
+  return fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&accept-language=es&zoom=18&lat='+lat+'&lon='+lng)
+    .then(r=>r.ok?r.json():null).then(j=>{
+      if(!j||!j.address) return '';
+      const a=j.address;
+      const calle=(a.road||a.pedestrian||a.footway||'')+(a.house_number?' # '+a.house_number:'');
+      const barrio=a.neighbourhood||a.suburb||a.quarter||a.residential||a.hamlet||'';
+      const muni=a.town||a.city||a.village||a.county||'';
+      const d=[calle,barrio,muni].filter((v,i,arr)=>v&&arr.indexOf(v)===i).join(', ')||j.display_name||'';
+      GEO_CACHE[k]=d; return d;
+    }).catch(()=>'');
+}
+/* --- Nominatim: texto → coordenadas (limitado al municipio) --- */
+function geoSearch(){
+  const inp=$('#geoQ'), q=inp?inp.value.trim():''; const m=MAPS[0];
+  if(!q||!m) return;
+  fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=es&countrycodes=co&bounded=1&viewbox='+JAGUA_BOX+'&q='+encodeURIComponent(q))
+    .then(r=>r.json()).then(j=>{
+      if(MAPS[0]!==m) return;
+      if(!j.length){ toast('No se encontró "'+q+'" en La Jagua de Ibirico',true); return; }
+      const ll=[+j[0].lat,+j[0].lon]; m.setView(ll,17); setPick(m,ll);
+    }).catch(()=>toast('No se pudo consultar el servicio de búsqueda',true));
+}
+
+/* --- Mapa general de reportes --- */
+function mapReports(){ return reports.filter(r=>!S.mapHide[r.estado]); }
+function legendHTML(){
+  return STATES.map(s=>'<button class="'+(S.mapHide[s]?'off':'')+'" onclick="toggleState(\''+s+'\')"><i style="background:'+SHEX[s]+'"></i>'+s+' ('+reports.filter(r=>r.estado===s).length+')</button>').join('');
+}
+function toggleState(s){
+  S.mapHide[s]=!S.mapHide[s];
+  const r=S.mapSel&&get(S.mapSel); if(r&&S.mapHide[r.estado]) S.mapSel=null;
+  $('#legend').innerHTML=legendHTML(); paintMap();
+}
+function fitAll(m){
+  const rs=mapReports();
+  if(!rs.length){ m.setView(JAGUA,15); return; }
+  m.fitBounds(L.latLngBounds(rs.map(r=>[r.lat,r.lng])),{paddingTopLeft:[60,50],paddingBottomRight:[30,30],maxZoom:17});
+}
+function initBigMap(){
+  const m=makeMap('bigMap',{layers:true}); if(!m) return;
+  toolCtl([['expand','Ver todos los reportes',()=>fitAll(m)],['target','Mi ubicación',()=>locateMe(m)]]).addTo(m);
+  m.on('click',()=>selPin(null));
+  paintMap(); fitAll(m);
+}
+function paintMap(){
+  const c=$('#mapCard'); if(!c) return;
+  const m=MAPS[0];
+  if(m){
+    Object.keys(MK).forEach(k=>MK[k].remove()); MK={};
+    mapReports().forEach(r=>{
+      const sel=r.id===S.mapSel;
+      MK[r.id]=L.marker([r.lat,r.lng],{icon:mkIcon(SHEX[r.estado],sel),zIndexOffset:sel?1000:0,title:r.id+' · '+r.ubicacion})
+        .on('click',()=>selPin(r.id)).addTo(m);
+    });
+  }
+  const r=S.mapSel?get(S.mapSel):null;
+  if(!r){ c.classList.remove('show'); c.innerHTML=''; return; }
+  c.innerHTML='<div class="mt"><b>'+r.id+'</b><button class="x" onclick="selPin(null)" aria-label="Cerrar">'+ic('close')+'</button></div>'+
+    '<p>'+esc(r.ubicacion)+'</p><p>'+esc(r.tipo)+' · <span class="coords">'+fmtLL(r)+'</span></p>'+
+    '<div class="row">'+pB(r.prioridad)+sB(r.estado)+'</div>'+
+    '<button class="btn-primary" onclick="openReport(\''+r.id+'\')">Ver detalle</button>';
+  c.classList.add('show');
+}
+function selPin(id){
+  S.mapSel=id; paintMap();
+  const m=MAPS[0], r=id&&get(id);
+  if(m&&r) m.panTo([r.lat,r.lng]);
+}
+
+/* --- Mini mapa del detalle --- */
+function initMiniMap(r){
+  const m=makeMap('miniMap',{center:[r.lat,r.lng],z:17,wheel:false});
+  if(m) L.marker([r.lat,r.lng],{icon:mkIcon(SHEX[r.estado],true),interactive:false}).addTo(m);
+  if(!r.dir) reverseGeo(r.lat,r.lng).then(d=>{ r.dir=d||'No disponible'; const el=$('#dirV'); if(el) el.textContent=r.dir; });
+}
+function openExt(id,kind){
+  const r=get(id); if(!r) return;
+  const url = kind==='ruta'
+    ? 'https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=%3B'+r.lat+'%2C'+r.lng
+    : 'https://www.openstreetmap.org/?mlat='+r.lat+'&mlon='+r.lng+'#map=18/'+r.lat+'/'+r.lng;
+  window.open(url,'_blank','noopener');
+}
+
+/* --- Mapa para marcar la ubicación de un nuevo reporte --- */
+function initPickMap(){
+  const m=makeMap('pickMap',{z:15}); if(!m) return;
+  toolCtl([['target','Usar mi ubicación',()=>locateMe(m,ll=>setPick(m,ll))]]).addTo(m);
+  m.on('click',e=>setPick(m,[e.latlng.lat,e.latlng.lng]));
+}
+function setPick(m,ll){
+  S.pick={lat:+ll[0].toFixed(6),lng:+ll[1].toFixed(6),dir:''};
+  if(!PICK_MK){
+    PICK_MK=L.marker(ll,{icon:mkIcon('#2E7D32',true),draggable:true,autoPan:true}).addTo(m);
+    PICK_MK.on('dragend',()=>{ const p=PICK_MK.getLatLng(); setPick(m,[p.lat,p.lng]); });
+  } else PICK_MK.setLatLng(ll);
+  const st=$('#pickState'); st.classList.add('ok');
+  st.textContent='Ubicación marcada ('+fmtLL(S.pick)+') · buscando dirección…';
+  const seq=++geoSeq; clearTimeout(geoT);
+  geoT=setTimeout(()=>reverseGeo(S.pick.lat,S.pick.lng).then(d=>{
+    if(seq!==geoSeq||!$('#pickState')) return;
+    S.pick.dir=d||'';
+    $('#pickState').textContent = d ? 'Ubicación marcada ✓ '+d : 'Ubicación marcada ✓ ('+fmtLL(S.pick)+')';
+    const u=$('#nUbic');
+    if(d && u && (!u.value.trim() || u.value===S.autoUbic)){ u.value=d; S.autoUbic=d; $('#g-ubic').classList.remove('err'); }
+  }),600); // espera breve: respeta el límite de 1 consulta/seg de Nominatim
+}
+
+/* =============== COMPONENTES DE LISTA =============== */
+const sortRecent=rs=>rs.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.id.localeCompare(a.id));
+function longDate(){ const t=new Date().toLocaleDateString('es-CO',{weekday:'long',day:'numeric',month:'long'}); return t.charAt(0).toUpperCase()+t.slice(1); }
+function emptyV(t){ return '<div class="v-empty">'+ic('leaf')+'<p>'+t+'</p></div>'; }
+function secH(t){ return '<div class="sec-h"><span>'+t+'</span><button onclick="goRoot(\'reportes\')">Ver todos ›</button></div>'; }
+function alertV(n){ return '<button class="v-alert" onclick="gotoNuevos()"><span class="ico">'+ic('alert')+'</span><span class="tx"><b>'+n+(n===1?' reporte nuevo':' reportes nuevos')+'</b><span>Pendientes de revisión</span></span><span class="chev">›</span></button>'; }
+function filterTo(s){ S.f={q:'',estado:s,prior:''}; goRoot('reportes'); }
+function cardC(r){
+  return '<div class="c-card" style="--sc:'+SHEX[r.estado]+'" onclick="openReport(\''+r.id+'\')"><div class="c-top"><b>'+esc(r.tipo)+'</b>'+sB(r.estado)+'</div>'+
+    '<div class="c-loc">'+ic('pin')+esc(r.ubicacion)+'</div><div class="c-bot"><span>'+r.id+' · '+fmtF(r.fecha)+'</span>'+pB(r.prioridad)+'</div></div>';
+}
+const searchV=()=>'<div class="searchbox">'+ic('search')+'<input placeholder="Buscar por ID, ubicación o tipo" value="'+esc(S.f.q)+'" oninput="setF(\'q\',this.value)"></div>';
+
+function chipsHTML(){
+  const base=visible();
+  return [['','Todos',base.length]].concat(STATES.map(s=>[s,s,base.filter(r=>r.estado===s).length]))
+    .map(c=>'<button class="fchip'+(S.f.estado===c[0]?' on':'')+'" onclick="setF(\'estado\',\''+c[0]+'\')">'+c[1]+'<i>'+c[2]+'</i></button>').join('');
+}
+function filtered(){
+  const q=S.f.q.trim().toLowerCase();
+  return visible().filter(r=>
+    (!q || r.id.toLowerCase().includes(q) || r.ubicacion.toLowerCase().includes(q) || r.tipo.toLowerCase().includes(q)) &&
+    (!S.f.estado || r.estado===S.f.estado) && (!S.f.prior || r.prioridad===S.f.prior)
+  ).sort((a,b)=> b.fecha.localeCompare(a.fecha) || b.id.localeCompare(a.id));
+}
+function renderList(){
+  const rs=filtered();
+  $('#vChips').innerHTML=chipsHTML();
+  $('#repList').innerHTML=rs.length ? rs.map(cardC).join('') : emptyV('No se encontraron reportes con esos filtros.');
+}
+function setF(k,v){ S.f[k]=v; renderList(); }
+function clearF(){ S.f={q:'',estado:'',prior:''}; render(); }
+function opts(list,sel,all){ return '<option value="">'+all+'</option>'+list.map(x=>'<option'+(x===sel?' selected':'')+'>'+x+'</option>').join(''); }
+
+/* =============== PÁGINAS =============== */
+const PAGES = {
+
+  inicio:{ title:()=>'Panel de control', html:()=>{
+  const rs=visible(), n=rs.length, admin=S.role==='admin', c=s=>rs.filter(r=>r.estado===s).length;
+  const done=c('Atendido')+c('Cerrado'), pct=n?Math.round(done/n*100):0, nuevos=reports.filter(r=>r.estado==='Nuevo').length;
+  const ICS={'Nuevo':'info','En revisión':'clock','Atendido':'check','Cerrado':'lock'};
+  return '<div class="c-hero"><span class="c-date">'+longDate()+'</span><h3>Hola, '+(admin?'Administrador':'vecino/a')+'</h3>'+
+      '<div class="c-ring-row"><div class="c-ring" style="--p:'+pct+'%"><b>'+pct+'%</b></div><p><b>'+done+' de '+n+'</b> '+(admin?'reportes de la comunidad':'de tus reportes')+' ya fueron atendidos o cerrados.</p></div></div>'+
+    '<div class="c-tiles">'+STATES.map(s=>'<button class="c-tile" onclick="filterTo(\''+s+'\')"><span class="ti" style="background:var(--'+SCLS[s]+'-bg);color:var(--'+SCLS[s]+')">'+ic(ICS[s])+'</span><b>'+c(s)+'</b><span>'+s+'</span></button>').join('')+'</div>'+
+    (admin&&nuevos?alertV(nuevos):'')+
+    secH('Reportes recientes')+(n?sortRecent(rs).slice(0,3).map(cardC).join(''):emptyV('Aún no hay reportes.'));
+}},
+
+  reportes:{ title:()=>S.role==='admin'?'Reportes':'Mis reportes', html:()=>
+    '<div class="c-sticky">'+searchV()+'<div class="fchips" id="vChips"></div></div><div id="repList"></div>',
+    after:()=>renderList() },
+
+  detalle:{ title:p=>'Reporte '+p.id, html:p=>{
+    const r=get(p.id); if(!r) return '<div class="empty">Este reporte ya no existe.</div>';
+    const admin=S.role==='admin';
+    let h='';
+    if(r.estado==='Cerrado') h+='<div class="banner">'+ic('lock')+'<span>Este reporte fue cerrado. '+(admin?'Puedes reabrirlo desde el panel de gestión.':'La administración lo marcó como finalizado.')+'</span></div>';
+    h+='<div class="card"><div class="hero"><div><div class="id">'+r.id+'</div><h3>'+esc(r.tipo)+'</h3></div><div class="bs">'+sB(r.estado)+pB(r.prioridad)+'</div></div>'+
+      '<div class="irow"><span class="k">Fecha</span><span class="v">'+fmtF(r.fecha)+'</span></div>'+
+      '<div class="irow"><span class="k">Ubicación</span><span class="v">'+esc(r.ubicacion)+'</span></div>'+
+      '<div class="irow"><span class="k">Dirección aprox.</span><span class="v" id="dirV">'+(r.dir?esc(r.dir):'Consultando…')+'</span></div>'+
+      (admin?'<div class="irow"><span class="k">Reportado por</span><span class="v">'+(r.owner==='usuario'?'Usuario demo':'Otro ciudadano')+'</span></div>':'')+'</div>';
+    h+='<div class="card"><div class="card-h"><span class="l">Descripción</span></div><p class="desc">'+esc(r.desc)+'</p></div>';
+    h+='<div class="card"><div class="card-h"><span class="l">Evidencia fotográfica</span></div>'+
+      (r.foto?'<div class="photo">'+ic('camera')+'Fotografía adjunta (simulada)</div>':'<div class="photo none">Sin evidencia fotográfica</div>')+'</div>';
+    h+='<div class="card"><div class="card-h"><span class="l">Ubicación en el mapa</span><span class="coords">'+fmtLL(r)+'</span></div>'+
+      '<div class="mapbox mini"><div class="lmap" id="miniMap"></div></div>'+
+      '<div class="map-tools"><button onclick="openExt(\''+r.id+'\',\'ver\')">'+ic('ext')+'Abrir en OSM</button><button onclick="openExt(\''+r.id+'\',\'ruta\')">'+ic('route')+'Cómo llegar</button></div></div>';
+    h+='<div class="card"><div class="card-h"><span class="l">Historial</span></div>'+
+      r.log.slice().reverse().map(l=>'<div class="tl"><i></i><div><b>'+esc(l.t)+'</b><span>'+fmtF(l.f)+'</span></div></div>').join('')+'</div>';
+    if(admin){
+      h+='<div class="card admin"><div class="card-h"><span class="l">'+ic('shield')+' Gestión del reporte</span></div>'+
+        '<div class="lbl">Estado</div><div class="chips">'+STATES.map(s=>'<button class="chip'+(r.estado===s?' on '+SCLS[s]:'')+'" onclick="setEstado(\''+r.id+'\',\''+s+'\')">'+s+'</button>').join('')+'</div>'+
+        '<div class="lbl">Prioridad</div><div class="chips">'+PRIORS.map(s=>'<button class="chip'+(r.prioridad===s?' on '+PCLS[s]:'')+'" onclick="setPrior(\''+r.id+'\',\''+s+'\')">'+s+'</button>').join('')+'</div>'+
+        '<div class="lbl">Nota para el historial (opcional)</div><textarea id="admNote" placeholder="Ej: Se verificó en sitio..."></textarea>'+
+        (r.estado==='Cerrado'
+          ? '<button class="btn-primary full" onclick="reopenRep(\''+r.id+'\')">'+ic('unlock')+' Reabrir reporte</button>'
+          : '<button class="btn-dark full" onclick="closeRep(\''+r.id+'\')">'+ic('lock')+' Cerrar reporte</button>')+
+        '<button class="btn-danger full" onclick="askDelete(\''+r.id+'\')">'+ic('trash')+' Eliminar reporte</button></div>';
+    }
+    return h;
+  }, after:p=>{ const r=get(p.id); if(r) initMiniMap(r); } },
+
+  mapa:{ title:()=>'Mapa de reportes', html:()=>
+    '<div class="sub-head">Mapa satelital de La Jagua de Ibirico. Toca la leyenda para filtrar por estado.</div>'+
+    '<div class="legend" id="legend">'+legendHTML()+'</div>'+
+    '<div class="mapbox"><div class="lmap" id="bigMap"></div><div class="map-card" id="mapCard"></div></div>'+
+    '<div class="hint">Toca un marcador para ver el reporte.</div>',
+    after:()=>{ S.mapSel=null; initBigMap(); } },
+
+  estadisticas:{ title:()=>'Estadísticas', html:()=>{
+    const rs=reports, n=rs.length;
+    const cs=s=>rs.filter(r=>r.estado===s).length, cp=p=>rs.filter(r=>r.prioridad===p).length;
+    const atend=cs('Atendido'), cerr=cs('Cerrado');
+    const pend=cs('Nuevo')+cs('En revisión');
+    const pct=v=>n?Math.round(v/n*100):0;
+    const kp=[['Total',n,'g'],['Atendidos',atend,'atendido'],['Pendientes',pend,'revision'],['Prioridad alta',cp('Alta'),'alta']];
+    let acc=0; const stops=[];
+    PRIORS.forEach(p=>{ const v=n?cp(p)/n*100:0; stops.push(PHEX[p]+' '+acc+'% '+(acc+v)+'%'); acc+=v; });
+    const maxT=Math.max(1,...TIPOS.map(t=>rs.filter(r=>r.tipo===t).length));
+    return '<div class="kpis">'+kp.map(k=>'<div class="kpi"><div class="n">'+k[1]+'</div><div class="l" style="margin-bottom:0">'+k[0]+'</div></div>').join('')+'</div>'+
+      '<div class="card"><div class="card-h"><span class="l">Tasa de atención</span></div><div class="rate"><div class="big">'+pct(atend+cerr)+'%</div><p>de los reportes están atendidos o cerrados ('+(atend+cerr)+' de '+n+').</p></div></div>'+
+      '<div class="card"><div class="card-h"><span class="l">Distribución por estado</span></div>'+
+        STATES.map(s=>'<div class="bar"><div class="lb">'+s+'</div><div class="tr"><div class="fl" style="width:'+pct(cs(s))+'%;background:'+SHEX[s]+'"></div></div><div class="vl">'+cs(s)+' · '+pct(cs(s))+'%</div></div>').join('')+'</div>'+
+      '<div class="card"><div class="card-h"><span class="l">Distribución por prioridad</span></div><div class="donut-row"><div class="donut" style="background:'+(n?'conic-gradient('+stops.join(',')+')':'#EEF1ED')+'"></div>'+
+        '<div class="dl">'+PRIORS.map(p=>'<div><i style="background:'+PHEX[p]+'"></i>'+p+': '+cp(p)+' ('+pct(cp(p))+'%)</div>').join('')+'</div></div></div>'+
+      '<div class="card"><div class="card-h"><span class="l">Por tipo de residuo</span></div>'+
+        TIPOS.map(t=>{const v=rs.filter(r=>r.tipo===t).length; return '<div class="bar"><div class="lb" style="width:116px;font-size:11.5px">'+t+'</div><div class="tr"><div class="fl" style="width:'+Math.round(v/maxT*100)+'%;background:var(--primary)"></div></div><div class="vl" style="width:24px">'+v+'</div></div>';}).join('')+'</div>';
+  }},
+
+  nuevo:{ title:()=>'Nuevo reporte', html:()=>
+    '<div class="sub-head">Completa la información del punto de acumulación de residuos.</div>'+
+    '<form class="card" id="repForm" onsubmit="return submitReport(event)" novalidate>'+
+      '<div class="fld" id="g-ubic"><label>Ubicación *</label><input id="nUbic" placeholder="Ej: Barrio Centro, calle principal"></div>'+
+      '<div class="fld"><label>Marcar en el mapa (opcional)</label>'+
+        '<div class="searchbox" style="margin-bottom:8px">'+ic('search')+'<input id="geoQ" placeholder="Buscar lugar o calle en La Jagua" onkeydown="if(event.key===\'Enter\'){event.preventDefault();geoSearch();}"><button type="button" class="btn-view" onclick="geoSearch()">Buscar</button></div>'+
+        '<div class="mapbox pick"><div class="lmap" id="pickMap"></div><span class="pick-hint">Toca el mapa o arrastra el marcador</span></div>'+
+        '<div class="pick-state" id="pickState">Sin marcar: se asignará una posición aproximada.</div></div>'+
+      '<div class="fld" id="g-tipo"><label>Tipo de residuo *</label><select id="nTipo"><option value="">Selecciona...</option>'+TIPOS.map(t=>'<option>'+t+'</option>').join('')+'</select></div>'+
+      '<div class="fld" id="g-prior"><label>Prioridad *</label><select id="nPrior"><option value="">Selecciona...</option>'+PRIORS.map(p=>'<option>'+p+'</option>').join('')+'</select></div>'+
+      '<div class="fld"><label>Fecha</label><input type="date" id="nFecha" value="'+today()+'"></div>'+
+      '<div class="fld"><label>Fotografía / evidencia</label><div class="photo-box" id="photoBox" onclick="togglePhoto()">'+ic('camera')+'<span id="photoTxt">Toca para adjuntar una fotografía (simulado)</span></div></div>'+
+      '<div class="fld" id="g-desc"><label>Descripción *</label><textarea id="nDesc" rows="3" placeholder="Describe brevemente el punto reportado..."></textarea></div>'+
+      '<div class="f-actions"><button type="submit" class="btn-primary">Enviar reporte</button><button type="button" class="btn-ghost" onclick="back()">Cancelar</button></div>'+
+    '</form>',
+    after:()=>{ S.photo=false; S.pick=null; S.autoUbic=''; initPickMap(); } },
+
+  sobre:{ title:()=>'Sobre el prototipo', html:()=>
+    '<div class="card about"><h4>¿Qué es Jagua Limpia?</h4><p>Jagua Limpia es una propuesta tecnológica orientada a facilitar el reporte y seguimiento de puntos de acumulación de residuos sólidos en La Jagua de Ibirico.</p>'+
+    '<h4>Propósito del sistema</h4><p>Ofrecer una herramienta digital para que la ciudadanía registre puntos con acumulación de residuos y para que la administración pueda consultarlos, organizarlos y darles seguimiento.</p>'+
+    '<h4>Participación ciudadana</h4><p>Cualquier habitante puede registrar un reporte indicando ubicación, tipo de residuo y descripción, fortaleciendo la vigilancia comunitaria del entorno.</p>'+
+    '<h4>Seguimiento de reportes</h4><p>Cada reporte pasa por los estados Nuevo, En revisión, Atendido y Cerrado. La administración puede cambiar el estado, cerrar y reabrir reportes, y el historial queda registrado.</p>'+
+    '<h4>Ubicación geográfica</h4><p>El sistema está pensado para el municipio de La Jagua de Ibirico, Cesar, Colombia. Cada reporte se asocia a un punto del mapa.</p>'+
+    '<h4>Importancia para la gestión ambiental</h4><p>Contar con información organizada y georreferenciada facilita la toma de decisiones y la priorización de acciones frente a la acumulación de residuos sólidos.</p>'+
+    '<div class="note"><b>Nota:</b> Este prototipo representa la estructura, navegación y funcionalidades principales del sistema. El mapa es real: usa Leaflet con cartografía de OpenStreetMap, imágenes satelitales de Esri y el geocodificador Nominatim para obtener direcciones. Una implementación completa requeriría además autenticación real, base de datos y almacenamiento de fotografías. La herramienta no realiza recolección de basura ni asigna vehículos: es un apoyo digital de registro y seguimiento.</div></div>' }
+};
+
+/* =============== NAVEGACIÓN =============== */
+function tabsFor(){
+  const t=[['inicio','Inicio','home'],['reportes','Reportes','list'],['mapa','Mapa','map'],['estadisticas','Estadísticas','chart']];
+  if(S.role==='usuario') t.push(['nuevo','Nuevo','plus']);
+  return t;
+}
+function drawerItems(){ return tabsFor().concat([['sobre','Sobre el prototipo','info']]); }
+
+function nav(page,params,mode){
+  const e={page:page,params:params||{}};
+  if(mode==='root') S.stack=[e];
+  else if(mode==='replace') S.stack[S.stack.length-1]=e;
+  else S.stack.push(e);
+  render();
+}
+function goRoot(p){ nav(p,{},'root'); }
+function back(){ if(S.stack.length>1){ S.stack.pop(); render(); } }
+function openReport(id){ nav('detalle',{id:id}); }
+function gotoNuevos(){ S.f={q:'',estado:'Nuevo',prior:''}; goRoot('reportes'); }
+
+function render(){
+  const cur=S.stack[S.stack.length-1], P=PAGES[cur.page];
+  const root=S.stack.length===1;
+  $('#topTitle').innerHTML=esc(P.title(cur.params))+'<small>'+ROLE_NAME[S.role]+' · '+esc(S.email)+'</small>';
+  const tl=$('#topLeft');
+  tl.innerHTML=ic(root?'menu':'back');
+  tl.setAttribute('aria-label',root?'Abrir menú':'Volver');
+  tl.onclick=root?openDrawer:back;
+  destroyMaps();
+  $('#view').innerHTML=P.html(cur.params);
+  $('#view').scrollTop=0;
+  if(P.after)P.after(cur.params);
+  const base=S.stack[0].page;
+  $('#tabbar').innerHTML=tabsFor().map(t=>'<button class="tab'+(t[0]===base?' active':'')+'" data-k="'+t[0]+'" onclick="goRoot(\''+t[0]+'\')">'+ic(t[2])+t[1]+'</button>').join('');
+  $('#drList').innerHTML=drawerItems().map(t=>'<button class="dr-item'+(t[0]===base?' active':'')+'" onclick="goRoot(\''+t[0]+'\')">'+ic(t[2])+t[1]+'</button>').join('');
+  closeDrawer();
+}
+function openDrawer(){ $('#drawer').classList.add('open'); $('#drawerOv').classList.add('show'); }
+function closeDrawer(){ $('#drawer').classList.remove('open'); $('#drawerOv').classList.remove('show'); }
+
+/* =============== LOGIN / LOGOUT (dos usuarios de prueba) =============== */
+const USERS = {
+  'admin@gmail.com':   {pass:'admin123',   role:'admin'},
+  'usuario@gmail.com': {pass:'usuario123', role:'usuario'}
+};
+const ROLE_NAME = {admin:'Administrador', usuario:'Usuario'};
+function fillDemo(k){
+  $('#lgEmail').value=k+'@gmail.com';
+  $('#lgPass').value=USERS[k+'@gmail.com'].pass;
+  loginError('');
+}
+function loginError(msg){
+  const el=$('#lgErr');
+  el.innerHTML=msg?ic('alert')+'<span>'+esc(msg)+'</span>':'';
+  el.classList.toggle('show',!!msg);
+}
+function doLogin(e){
+  e.preventDefault();
+  const email=$('#lgEmail').value.trim().toLowerCase(), pass=$('#lgPass').value;
+  $('#g-email').classList.toggle('err',!email);
+  $('#g-pass').classList.toggle('err',!pass);
+  if(!email||!pass){ loginError('Ingresa tu correo y tu contraseña.'); return false; }
+  const u=USERS[email];
+  if(!u||u.pass!==pass){
+    $('#g-email').classList.add('err'); $('#g-pass').classList.add('err');
+    loginError('Correo o contraseña incorrectos.');
+    return false;
+  }
+  loginError('');
+  $('#g-email').classList.remove('err'); $('#g-pass').classList.remove('err');
+  S.role=u.role; S.email=email; S.f={q:'',estado:'',prior:''};
+  $('#login').classList.add('hidden');
+  $('#app').classList.add('on');
+  const isAdmin=S.role==='admin';
+  $('#drRole').innerHTML=ic(isAdmin?'shield':'user')+ROLE_NAME[S.role];
+  goRoot('inicio');
+  toast('Sesión iniciada como '+ROLE_NAME[S.role]);
+  return false;
+}
+function logout(){
+  closeDrawer(); closeModal(); destroyMaps();
+  $('#app').classList.remove('on');
+  $('#login').classList.remove('hidden');
+  S.role=null; S.email=''; S.stack=[];
+  $('#lgEmail').value=''; $('#lgPass').value='';
+  $('#g-email').classList.remove('err'); $('#g-pass').classList.remove('err');
+  loginError('');
+  toast('Sesión cerrada');
+}
+function resetProto(){ reports=seed(); nextNum=7; if(S.role) logout(); if(!$('#register').classList.contains('hidden')) closeRegister(); }
+
+/* =============== CREAR CUENTA (solo prototipo: no guarda nada) =============== */
+const RG = {step:1, type:null};
+const RG_FIELDS = ['rgName','rgDoc','rgPhone','rgCargo','rgBarrio','rgDir','rgEmail','rgPass','rgPass2'];
+function regShow(step){
+  RG.step=step;
+  ['1','2','3'].forEach(n=>$('#rgStep'+n).classList.toggle('hidden',String(step)!==n));
+  $('#rgTitle').textContent = step===3 ? 'Cuenta creada' : 'Crear cuenta';
+  $('#register').scrollTop=0;
+}
+function regClear(){
+  $('#rgForm').reset();
+  RG_FIELDS.forEach(id=>setE(id,''));
+  RG.type=null;
+}
+function openRegister(){
+  regClear();
+  $('#login').classList.add('hidden');
+  $('#register').classList.remove('hidden');
+  regShow(1);
+}
+function closeRegister(){
+  $('#register').classList.add('hidden');
+  $('#login').classList.remove('hidden');
+  regClear();
+}
+function regBack(){ if(RG.step===2) regShow(1); else closeRegister(); }
+function pickType(t){
+  RG.type=t;
+  const admin=t==='admin';
+  $('#rgChip').innerHTML=ic(admin?'shield':'user')+'Cuenta de '+ROLE_NAME[t];
+  $('#g-rgCargo').classList.toggle('hidden',!admin);
+  regShow(2);
+}
+function setE(id,msg){
+  const g=$('#g-'+id); if(g) g.classList.toggle('err',!!msg);
+  const e=$('#e-'+id); if(e) e.textContent=msg||'';
+  return !!msg;
+}
+function submitRegister(e){
+  e.preventDefault();
+  const v=id=>$('#'+id).value.trim();
+  const admin=RG.type==='admin';
+  const phone=v('rgPhone').replace(/[\s-]/g,'');
+  let bad=0;
+  bad+=setE('rgName', /\S+\s+\S+/.test(v('rgName')) ? '' : 'Ingresa tu nombre y apellido.');
+  bad+=setE('rgDoc', /^\d{6,10}$/.test(v('rgDoc')) ? '' : 'Ingresa un documento de 6 a 10 dígitos.');
+  bad+=setE('rgPhone', /^\d{7,10}$/.test(phone) ? '' : 'Ingresa un teléfono de 7 a 10 dígitos.');
+  bad+=setE('rgCargo', admin && !v('rgCargo') ? 'Indica tu cargo o dependencia.' : '');
+  bad+=setE('rgBarrio', $('#rgBarrio').value ? '' : 'Selecciona un barrio.');
+  bad+=setE('rgDir', v('rgDir') ? '' : 'Ingresa tu dirección.');
+  bad+=setE('rgEmail', /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v('rgEmail')) ? '' : 'Ingresa un correo válido.');
+  bad+=setE('rgPass', $('#rgPass').value.length>=6 ? '' : 'Mínimo 6 caracteres.');
+  bad+=setE('rgPass2', $('#rgPass2').value && $('#rgPass2').value===$('#rgPass').value ? '' : 'Las contraseñas no coinciden.');
+  if(bad){
+    const first=$('#register .fld.err');
+    if(first && first.scrollIntoView) first.scrollIntoView({block:'center'});
+    return false;
+  }
+  $('#rgOkMsg').textContent='Se creó la cuenta de '+ROLE_NAME[RG.type]+' para '+v('rgName')+'.';
+  $('#rgSummary').innerHTML=
+    '<div class="irow"><span class="k">Tipo</span><span class="v">'+ROLE_NAME[RG.type]+'</span></div>'+
+    '<div class="irow"><span class="k">Nombre</span><span class="v">'+esc(v('rgName'))+'</span></div>'+
+    '<div class="irow"><span class="k">Correo</span><span class="v">'+esc(v('rgEmail'))+'</span></div>'+
+    '<div class="irow"><span class="k">Teléfono</span><span class="v">'+esc(phone)+'</span></div>'+
+    '<div class="irow"><span class="k">Barrio</span><span class="v">'+esc($('#rgBarrio').value)+'</span></div>'+
+    (admin?'<div class="irow"><span class="k">Cargo</span><span class="v">'+esc(v('rgCargo'))+'</span></div>':'');
+  regShow(3);
+  return false;
+}
+
+/* =============== ACCIONES DEL ADMINISTRADOR =============== */
+function setEstado(id,est,verb){
+  const r=get(id); if(!r||S.role!=='admin')return;
+  if(r.estado===est){ toast('El reporte ya está en "'+est+'"',true); return; }
+  const noteEl=$('#admNote'); const note=noteEl?noteEl.value.trim():'';
+  const prev=r.estado; r.estado=est;
+  r.log.push({f:today(),t:(verb||'Estado')+': '+prev+' → '+est+(note?' · Nota: '+note:'')});
+  toast(verb?verb+' correctamente':'Estado actualizado a "'+est+'"');
+  render();
+}
+function closeRep(id){ setEstado(id,'Cerrado','Reporte cerrado'); }
+function reopenRep(id){ setEstado(id,'En revisión','Reporte reabierto'); }
+function setPrior(id,p){
+  const r=get(id); if(!r||S.role!=='admin')return;
+  if(r.prioridad===p) return;
+  const prev=r.prioridad; r.prioridad=p;
+  r.log.push({f:today(),t:'Prioridad: '+prev+' → '+p});
+  toast('Prioridad actualizada a "'+p+'"');
+  render();
+}
+function askDelete(id){
+  askConfirm('Eliminar reporte','Se eliminará '+id+' de forma definitiva en este prototipo. ¿Deseas continuar?','Eliminar',function(){
+    reports=reports.filter(r=>r.id!==id); S.mapSel=null;
+    toast('Reporte '+id+' eliminado');
+    back();
+  });
+}
+
+/* =============== NUEVO REPORTE (USUARIO) =============== */
+function togglePhoto(){
+  S.photo=!S.photo;
+  $('#photoBox').classList.toggle('has',S.photo);
+  $('#photoTxt').textContent=S.photo?'Fotografía adjuntada ✓ (simulada)':'Toca para adjuntar una fotografía (simulado)';
+}
+function submitReport(e){
+  e.preventDefault();
+  const v={ubic:$('#nUbic').value.trim(),tipo:$('#nTipo').value,prior:$('#nPrior').value,desc:$('#nDesc').value.trim(),fecha:$('#nFecha').value||today()};
+  const bad={'g-ubic':!v.ubic,'g-tipo':!v.tipo,'g-prior':!v.prior,'g-desc':!v.desc};
+  let any=false;
+  Object.keys(bad).forEach(k=>{ $('#'+k).classList.toggle('err',bad[k]); if(bad[k])any=true; });
+  if(any){ toast('Completa los campos obligatorios (*)',true); return false; }
+  const id='RP-'+String(nextNum++).padStart(3,'0');
+  // sin marcar: posición aproximada cerca del casco urbano
+  const pos=S.pick||{lat:+(JAGUA[0]+(Math.random()-.5)*0.012).toFixed(6),lng:+(JAGUA[1]+(Math.random()-.5)*0.012).toFixed(6),dir:''};
+  reports.push({id:id,fecha:v.fecha,ubicacion:v.ubic,tipo:v.tipo,prioridad:v.prior,estado:'Nuevo',owner:'usuario',foto:S.photo,lat:pos.lat,lng:pos.lng,dir:pos.dir,desc:v.desc,
+    log:[{f:v.fecha,t:'Reporte creado'}]});
+  S.f={q:'',estado:'',prior:''};
+  toast('Reporte '+id+' enviado correctamente');
+  goRoot('reportes');
+  return false;
+}
+
+/* =============== INICIO =============== */
+function tick(){ const d=new Date(); $('#clock').textContent=pad(d.getHours())+':'+pad(d.getMinutes()); }
+tick(); setInterval(tick,30000);
+$('#icCreate').innerHTML=ic('user');
+$('#tiUser').innerHTML=ic('user');
+$('#tiAdmin').innerHTML=ic('shield');
+$('#rgBack').innerHTML=ic('back');
+$('#rgBig').innerHTML=ic('check');
+$('#topLogout').innerHTML=ic('logout');
+$('#drLogout').innerHTML=ic('logout')+'Cerrar sesión';
+$('#drLogo').innerHTML=ic('leaf');
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeModal(); closeDrawer(); } });
+</script>
+</body>
+</html>
